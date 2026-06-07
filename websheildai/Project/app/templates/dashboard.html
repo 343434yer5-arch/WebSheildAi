@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-5 fw-bold text-dark">📊 Панель управления</h1>
+            <p class="lead text-muted">Мониторинг запросов к эндпоинту <code>/api/v1/analyze</code></p>
+            <hr>
+        </div>
+    </div>
+
+    <!-- Блок с общей статистикой (опционально) -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Всего запросов</h6>
+                    <h2 class="fw-bold">{{ total_requests|default(0) }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Последние 24ч</h6>
+                    <h2 class="fw-bold">{{ recent_requests|default(0) }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Уникальных IP</h6>
+                    <h2 class="fw-bold">{{ unique_ips|default(0) }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Среднее время ответа</h6>
+                    <h2 class="fw-bold">{{ avg_response_time|default(0) }} ms</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Таблица запросов -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">📋 История запросов</h5>
+            <button class="btn btn-sm btn-outline-secondary" id="refreshBtn">
+                🔄 Обновить
+            </button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col">Время</th>
+                            <th scope="col">IP адрес</th>
+                            <th scope="col">Метод</th>
+                            <th scope="col">Статус ответа</th>
+                            <th scope="col">Время обработки (ms)</th>
+                            <th scope="col">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if analyze_requests %}
+                            {% for req in analyze_requests %}
+                            <tr>
+                                <td>{{ req.timestamp }}</td>
+                                <td>{{ req.ip }}</td>
+                                <td>
+                                    <span class="badge {% if req.method == 'POST' %}bg-primary{% else %}bg-secondary{% endif %}">
+                                        {{ req.method }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge {% if req.status_code == 200 %}bg-success{% else %}bg-danger{% endif %}">
+                                        {{ Blocked }}
+                                    </span>
+                                </td>
+                                <td>{{ 0 }} ms</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-info detail-btn" data-id="{{ req.id }}" data-bs-toggle="modal" data-bs-target="#detailModal">
+                                        Подробнее
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">
+                                    Нет запросов для отображения
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для просмотра деталей запроса -->
+<div class="modal fade" id="detailModal" tabindex="-1" aria-labelledby="detailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="detailModalLabel">Детали запроса</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <pre id="requestDetails" style="background: #f8f9fa; padding: 1rem; border-radius: 8px;"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row">
+        <div class="col-12 text-center">
+            <a href="/api/v1/dashboard/incidents" class="btn btn-primary btn-lg px-5 py-3 shadow-sm" style="border-radius: 40px;">
+                📊 Перейти к инцидентам
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-arrow-right-short ms-2" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M4 8a.5.5 0 0 1 .5-.5h5.793L8.146 5.354a.5.5 0 1 1 .708-.708l3 3a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708-.708L10.293 8.5H4.5A.5.5 0 0 1 4 8z"/>
+                </svg>
+            </a>
+        </div>
+    </div>
+<script>
+    // Пример динамического обновления (опционально)
+    document.getElementById('refreshBtn')?.addEventListener('click', function() {
+        window.location.reload();
+    });
+
+    // Обработка показа деталей запроса
+    // Предполагается, что в analyze_requests каждый объект имеет поле 'details' (JSON)
+    // или мы можем загрузить детали по API. Для демонстрации используем данные из атрибутов.
+    const detailButtons = document.querySelectorAll('.detail-btn');
+    detailButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            // В реальном приложении можно загрузить данные по ID через fetch
+            // Здесь просто покажем пример статического текста
+            const requestId = this.getAttribute('data-id');
+            // Имитация получения деталей
+            const details = {
+                request_id: requestId,
+                url: '/api/v1/analyze',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'Mozilla/5.0 ...'
+                },
+                body: '{"text": "example text to analyze"}',
+                response: '{"result": "positive", "confidence": 0.95}'
+            };
+            document.getElementById('requestDetails').innerText = JSON.stringify(details, null, 2);
+        });
+    });
+</script>
+
+<!-- Дополнительный скрипт для инициализации Bootstrap модальных окон -->
+<script>
+    // Инициализация всех модальных окон (если они еще не инициализированы)
+    document.addEventListener('DOMContentLoaded', function() {
+        // Пустой, чтобы Bootstrap сам обработал
+    });
+</script>
+{% endblock %}
